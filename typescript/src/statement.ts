@@ -14,12 +14,13 @@ type Invoice = {
   customer: string;
   performances: Performance[];
 };
+export type Play = {
+  name: string;
+  type: string;
+}
 
 type EnrichedPerformance = Performance & {
-  play: {
-    name: string;
-    type: string;
-  };
+  play: Play;
   amount: number;
   volumeCredits: number;
 };
@@ -65,12 +66,42 @@ class ComedyCalculator extends PerformanceCalculator {
   }
 }
 
-function createPerformanceCalculator(performance: Performance, play: { name: string; type: string }): PerformanceCalculator {
+class HistoryCalculator extends PerformanceCalculator {
+  get amount(): number {
+    let result = 35000;
+    if (this.performance.audience > 25) {
+      result += 800 * (this.performance.audience - 25);
+    }
+    return result;
+  }
+
+  public get volumeCredits(): number {
+    return super.volumeCredits + Math.floor(this.performance.audience / 10);
+  }
+}
+
+class PastoralCalculator extends PerformanceCalculator {
+  get amount(): number {
+    let result = 20000;
+    result += 400 * this.performance.audience;
+    return Math.min(result, 60000);
+  }
+
+  public get volumeCredits(): number {
+    return Math.floor(this.performance.audience / 3);
+  }
+}
+
+function createPerformanceCalculator(performance: Performance, play: Play): PerformanceCalculator {
   switch (play.type) {
     case "tragedy":
       return new TragedyCalculator(performance);
     case "comedy":
       return new ComedyCalculator(performance);
+    case "history":
+      return new HistoryCalculator(performance);
+    case "pastoral":
+      return new PastoralCalculator(performance);
     default:
       throw new Error(`unknown type: ${play.type}`);
   }
@@ -113,12 +144,31 @@ function renderPlainText(statement: StatementData) {
   return result;
 }
 
+function renderHtml(data: StatementData) {
+  let result = `<h1>Statement for ${data.customer}</h1>\n`;
+  result += "<table>\n";
+  result += "<tr><th>play</th><th>seats</th><th>cost</th></tr>\n";
+  for (const perf of data.performances) {
+    result += `<tr><td>${perf.play.name}</td><td>${perf.audience}</td>`;
+    result += `<td>${usd(perf.amount)}</td></tr>\n`;
+  }
+  result += "</table>\n";
+  result += `<p>Amount owed is <em>${usd(data.totalAmount)}</em></p>\n`;
+  result += `<p>You earned <em>${data.totalVolumeCredits}</em> credits</p>\n`;
+  return result;
+}
+
 function statement(invoice: Invoice, plays: Plays) {
   const statementData: StatementData = createStatementData(invoice, plays);
   return renderPlainText(statementData);
 }
 
-export { statement };
+function htmlStatement(invoice: Invoice, plays: Plays) {
+  const statementData: StatementData = createStatementData(invoice, plays);
+  return renderHtml(statementData);
+}
+
+export { statement, htmlStatement };
 
 
 
